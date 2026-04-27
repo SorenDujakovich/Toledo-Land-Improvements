@@ -1,0 +1,548 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Toledo, OH — Property Values by ZIP Code</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@700;900&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+:root{
+  --bg:#f4f1ea; --paper:#fbf9f3; --ink:#1a1a1a;
+  --muted:#6e6862; --line:#d8d2c3; --accent:#a83232;
+  --accent2:#2d5b6b;
+}
+body{
+  font-family:'Inter',system-ui,sans-serif;
+  background:var(--bg); color:var(--ink);
+  min-height:100vh;
+  padding:30px 20px;
+}
+
+.page{
+  max-width:1100px; margin:0 auto;
+  background:var(--paper);
+  padding:38px 44px;
+  border:1px solid var(--line);
+  box-shadow:0 2px 20px rgba(0,0,0,0.06);
+}
+.eyebrow{
+  font-size:11px; letter-spacing:0.18em; text-transform:uppercase;
+  color:var(--accent); font-weight:600;
+  margin-bottom:14px;
+}
+h1{
+  font-family:'Playfair Display',serif;
+  font-weight:900;
+  font-size:42px;
+  line-height:1.1;
+  letter-spacing:-0.01em;
+  margin-bottom:8px;
+}
+.subtitle{ font-size:16px; color:var(--muted); margin-bottom:6px; }
+.meta{
+  font-size:12px; color:var(--muted);
+  padding-bottom:24px; border-bottom:1px solid var(--line);
+  margin-bottom:24px;
+}
+
+/* ── Mode toggle ── */
+.mode-toggle{
+  display:flex; gap:0;
+  margin-bottom:24px;
+  border:1px solid var(--line);
+  background:#fff;
+  width:fit-content;
+}
+.mode-btn{
+  padding:14px 28px;
+  background:transparent; border:none;
+  font-family:'Inter',sans-serif;
+  font-size:13px; font-weight:600;
+  letter-spacing:0.04em;
+  color:var(--muted);
+  cursor:pointer;
+  transition:all 0.2s;
+  border-right:1px solid var(--line);
+}
+.mode-btn:last-child{border-right:none}
+.mode-btn:hover{color:var(--ink); background:#faf8f1}
+.mode-btn.active{
+  background:var(--ink); color:var(--paper);
+}
+.mode-btn .mb-label{
+  display:block; font-size:9px;
+  text-transform:uppercase; letter-spacing:0.12em;
+  font-weight:600; margin-bottom:2px;
+  color:var(--muted);
+}
+.mode-btn.active .mb-label{ color:rgba(251,249,243,0.6); }
+
+/* ── Stats strip ── */
+.stats-strip{
+  display:grid; grid-template-columns:repeat(4,1fr); gap:0;
+  margin-bottom:28px;
+  border:1px solid var(--line);
+  background:#fff;
+}
+.stat{
+  padding:16px 18px;
+  border-right:1px solid var(--line);
+}
+.stat:last-child{border-right:none}
+.stat-label{
+  font-size:10px; letter-spacing:0.12em; text-transform:uppercase;
+  color:var(--muted); margin-bottom:6px; font-weight:600;
+}
+.stat-val{
+  font-family:'Playfair Display',serif;
+  font-size:24px; font-weight:700;
+  color:var(--ink);
+}
+.stat-val small{font-size:13px; color:var(--muted); font-weight:400; font-family:'Inter',sans-serif}
+
+/* ── Map ── */
+.map-section{
+  display:grid; grid-template-columns:1fr 280px; gap:0;
+  border:1px solid var(--line);
+  margin-bottom:32px;
+}
+#map{ height:540px; background:#e8e4d8; }
+.legend-panel{
+  background:#fff;
+  border-left:1px solid var(--line);
+  padding:22px 22px;
+  display:flex; flex-direction:column; gap:18px;
+}
+.legend-title{
+  font-family:'Playfair Display',serif;
+  font-size:18px; font-weight:700;
+  border-bottom:1px solid var(--line);
+  padding-bottom:10px;
+}
+.legend-sub{ font-size:11px; color:var(--muted); margin-top:-12px; }
+.lscale{
+  display:flex; flex-direction:column; gap:0;
+  border:1px solid var(--line);
+}
+.lscale-row{
+  display:flex; align-items:center;
+  border-bottom:1px solid var(--line);
+}
+.lscale-row:last-child{border-bottom:none}
+.lswatch{
+  width:36px; height:30px; flex-shrink:0;
+  border-right:1px solid var(--line);
+  transition:background 0.3s;
+}
+.lscale-text{
+  padding:6px 12px; font-size:11px;
+  font-variant-numeric:tabular-nums;
+  font-weight:500; flex:1;
+}
+.callout{
+  font-size:11px; line-height:1.6; color:var(--muted);
+  padding:12px 14px;
+  background:rgba(168,50,50,0.04);
+  border-left:3px solid var(--accent);
+}
+.callout strong{color:var(--ink); font-weight:600}
+
+.section-title{
+  font-family:'Playfair Display',serif;
+  font-size:22px; font-weight:700;
+  margin-bottom:8px;
+}
+.section-desc{ font-size:13px; color:var(--muted); margin-bottom:16px; }
+table.zip-table{
+  width:100%; border-collapse:collapse;
+  background:#fff; font-size:13px;
+  border:1px solid var(--line);
+}
+table.zip-table th{
+  text-align:left; padding:10px 14px;
+  font-size:10px; letter-spacing:0.1em;
+  text-transform:uppercase; color:var(--muted);
+  background:#f9f7f0; border-bottom:1px solid var(--line);
+  font-weight:600;
+}
+table.zip-table td{
+  padding:11px 14px; border-bottom:1px solid var(--line);
+  font-variant-numeric:tabular-nums;
+}
+table.zip-table tr:last-child td{border-bottom:none}
+table.zip-table tr:hover{background:#faf8f1}
+.zip-tile{
+  display:inline-block; width:11px; height:11px;
+  margin-right:8px; vertical-align:middle;
+  border:1px solid rgba(0,0,0,0.1);
+}
+.bar-wrap{
+  display:inline-block; width:80px; height:6px;
+  background:#eeeae0; vertical-align:middle;
+  margin-left:8px;
+}
+.bar-fill{height:100%; transition:width 0.4s, background 0.4s}
+
+.footer-note{
+  margin-top:28px;
+  padding-top:18px;
+  border-top:1px solid var(--line);
+  font-size:11px; color:var(--muted); line-height:1.7;
+}
+
+#map-loading{
+  position:absolute; inset:0;
+  display:flex; align-items:center; justify-content:center;
+  background:#e8e4d8; color:var(--muted); font-size:13px;
+  pointer-events:none;
+}
+#map-loading.hidden{display:none}
+
+@media (max-width:780px){
+  .stats-strip{grid-template-columns:1fr 1fr}
+  .stat:nth-child(2){border-right:none}
+  .stat:nth-child(1),.stat:nth-child(2){border-bottom:1px solid var(--line)}
+  .map-section{grid-template-columns:1fr}
+  .legend-panel{border-left:none; border-top:1px solid var(--line)}
+  h1{font-size:30px}
+  .mode-btn{padding:12px 18px}
+}
+</style>
+</head>
+<body>
+
+<div class="page">
+
+  <div class="eyebrow">Lucas County · Toledo Parcel Data</div>
+  <h1>Toledo, Ohio<br/><span id="title-mode">Land Value</span> by ZIP Code</h1>
+  <p class="subtitle">Median assessed property values across Toledo's ZIP codes, derived from <span id="parcel-count">137,000+</span> parcel records.</p>
+  <p class="meta">Source: Lucas County Auditor parcel assessments · Aggregated to ZIP-code geography</p>
+
+  <div class="mode-toggle">
+    <button class="mode-btn active" id="btn-land" onclick="setMode('land')">
+      <span class="mb-label">View</span>Land Value
+    </button>
+    <button class="mode-btn" id="btn-bldg" onclick="setMode('bldg')">
+      <span class="mb-label">View</span>Building Value
+    </button>
+    <button class="mode-btn" id="btn-total" onclick="setMode('total')">
+      <span class="mb-label">View</span>Total Value
+    </button>
+  </div>
+
+  <div class="stats-strip">
+    <div class="stat">
+      <div class="stat-label" id="s-label-1">City Median Land Value</div>
+      <div class="stat-val" id="s-val-1">—</div>
+    </div>
+    <div class="stat">
+      <div class="stat-label">Highest ZIP</div>
+      <div class="stat-val" id="s-val-2">—</div>
+    </div>
+    <div class="stat">
+      <div class="stat-label">Lowest ZIP</div>
+      <div class="stat-val" id="s-val-3">—</div>
+    </div>
+    <div class="stat">
+      <div class="stat-label">Disparity</div>
+      <div class="stat-val" id="s-val-4">—<small>×</small></div>
+    </div>
+  </div>
+
+  <div class="map-section">
+    <div style="position:relative">
+      <div id="map"></div>
+      <div id="map-loading">Loading ZIP code boundaries…</div>
+    </div>
+    <div class="legend-panel">
+      <div>
+        <div class="legend-title" id="legend-title">Land Value</div>
+        <div class="legend-sub" id="legend-sub" style="margin-top:6px">Median assessed value per parcel</div>
+      </div>
+      <div class="lscale" id="lscale"></div>
+      <div class="callout" id="callout"></div>
+    </div>
+  </div>
+
+  <div class="section-title">ZIP-Level Detail</div>
+  <p class="section-desc" id="table-desc">All Toledo ZIP codes ranked by median land value.</p>
+
+  <table class="zip-table">
+    <thead>
+      <tr>
+        <th>ZIP</th>
+        <th>Area</th>
+        <th>Parcels</th>
+        <th id="th-land">Land</th>
+        <th id="th-bldg">Building</th>
+        <th id="th-total">Total</th>
+      </tr>
+    </thead>
+    <tbody id="zip-tbody"></tbody>
+  </table>
+
+  <p class="footer-note">
+    Property values reflect Lucas County Auditor's most recent assessed valuations, aggregated by ZIP code using parcel coordinates. Land and building values are reported separately by the assessor; "Total" is the combined parcel valuation. Medians used (rather than averages) to dampen the effect of outlier high-value commercial parcels. ZIP boundaries from Census TIGER cartographic files. Map: Leaflet · CartoDB Positron tiles.
+  </p>
+</div>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script>
+// ── Per-ZIP property values (median, computed from 137k Lucas County parcels) ──
+const ZIPS = {
+  '43604': {name:'Downtown Toledo',    count:3409,  land:5600,  bldg:27200,  total:32800 },
+  '43605': {name:'East Toledo',        count:9598,  land:7600,  bldg:29800,  total:37400 },
+  '43606': {name:'Old West End / Univ',count:6530,  land:19400, bldg:76500,  total:95900 },
+  '43607': {name:'West Toledo',        count:13435, land:6500,  bldg:39600,  total:46100 },
+  '43608': {name:'North Toledo',       count:10469, land:5600,  bldg:29600,  total:35200 },
+  '43609': {name:'South Toledo',       count:9114,  land:4600,  bldg:24900,  total:29500 },
+  '43610': {name:'Vistula / North End',count:8059,  land:5500,  bldg:32100,  total:37600 },
+  '43611': {name:'Point Place',        count:4562,  land:21600, bldg:79900,  total:101500 },
+  '43612': {name:'North Toledo',       count:14684, land:13500, bldg:46500,  total:60000 },
+  '43613': {name:'West Toledo / Trilby',count:20612,land:21600, bldg:95000,  total:116600 },
+  '43614': {name:'Reynolds Corners',   count:14962, land:19400, bldg:57900,  total:77300 },
+  '43615': {name:'West Toledo',        count:13714, land:26900, bldg:112900, total:139800 },
+  '43620': {name:'Old West End',       count:3164,  land:6600,  bldg:50350,  total:56950 },
+  '43623': {name:'Ottawa Hills border',count:4272,  land:38800, bldg:180100, total:218900 }
+};
+
+// ── Color schemes (per mode) ──
+const PALETTES = {
+  land:  ['#3a0e0e','#7a1f1f','#b85a3a','#e0a060','#f6dba0'],   // red→gold (matches income map)
+  bldg:  ['#0e2a3a','#1e4a5c','#3a7a8a','#7aaab8','#c8dde3'],   // teal scale
+  total: ['#2a1f3a','#4a3060','#7a4f8c','#a87fb8','#d8c0e0']    // purple scale
+};
+
+const LABELS = {
+  land:  'Land Value',
+  bldg:  'Building Value',
+  total: 'Total Property Value'
+};
+
+// Bracket cutoffs for each mode
+const BRACKETS = {
+  land:  [0, 6000,  10000,  18000,  28000,  Infinity],
+  bldg:  [0, 30000, 50000,  75000,  120000, Infinity],
+  total: [0, 35000, 50000,  80000,  140000, Infinity]
+};
+
+let currentMode = 'land';
+let geoLayer = null;
+let labelMarkers = [];
+
+function fmt(n) {
+  if (n >= 1000) return '$' + (n/1000).toFixed(0) + 'k';
+  return '$' + n.toLocaleString();
+}
+function fmtFull(n) { return '$' + n.toLocaleString(); }
+
+function getColor(value, mode) {
+  const breaks = BRACKETS[mode];
+  const palette = PALETTES[mode];
+  for (let i = breaks.length - 2; i >= 0; i--) {
+    if (value >= breaks[i]) return palette[i];
+  }
+  return palette[0];
+}
+
+function bracketLabel(i, mode) {
+  const b = BRACKETS[mode];
+  if (i === 0) return 'Under ' + fmt(b[1]);
+  if (i === 4) return fmt(b[4]) + ' and above';
+  return fmt(b[i]) + ' – ' + fmt(b[i+1]);
+}
+
+// ── Map init ──
+const map = L.map('map', {
+  center: [41.665, -83.575], zoom: 11,
+  zoomControl: true, scrollWheelZoom: false
+});
+L.tileLayer('https://{s}.basemaps.cartocdn.com/light_nolabels/{z}/{x}/{y}{r}.png', {
+  attribution: '&copy; OpenStreetMap &copy; CARTO', subdomains: 'abcd', maxZoom: 18
+}).addTo(map);
+L.tileLayer('https://{s}.basemaps.cartocdn.com/light_only_labels/{z}/{x}/{y}{r}.png', {
+  subdomains: 'abcd', maxZoom: 18, pane: 'shadowPane'
+}).addTo(map);
+
+const ZIP_GEOJSON_URL =
+  'https://raw.githubusercontent.com/OpenDataDE/State-zip-code-GeoJSON/master/oh_ohio_zip_codes_geo.min.json';
+
+async function loadMap() {
+  try {
+    const r = await fetch(ZIP_GEOJSON_URL);
+    if (!r.ok) throw new Error('HTTP ' + r.status);
+    const all = await r.json();
+    const ourZips = new Set(Object.keys(ZIPS));
+    const filtered = {
+      type: 'FeatureCollection',
+      features: all.features.filter(f => ourZips.has(f.properties.ZCTA5CE10))
+    };
+    document.getElementById('map-loading').classList.add('hidden');
+
+    geoLayer = L.geoJSON(filtered, {
+      style: feature => styleZip(feature),
+      onEachFeature: (feature, lyr) => {
+        const zip = feature.properties.ZCTA5CE10;
+        const d = ZIPS[zip];
+        if (!d) return;
+        const center = lyr.getBounds().getCenter();
+        const marker = L.marker(center, {
+          icon: makeLabelIcon(zip, d, currentMode),
+          interactive: false
+        }).addTo(map);
+        labelMarkers.push({marker, zip, data: d});
+
+        lyr.on('mouseover', () => lyr.setStyle({weight:3, color:'#1a1a1a'}));
+        lyr.on('mouseout', () => geoLayer.resetStyle(lyr));
+        lyr._zip = zip;
+        lyr._data = d;
+      }
+    }).addTo(map);
+
+    // Tooltip is mode-aware so we bind it dynamically
+    bindTooltips();
+
+    map.fitBounds(geoLayer.getBounds(), {padding:[20,20]});
+  } catch(e) {
+    document.getElementById('map-loading').innerHTML =
+      'Could not load ZIP boundaries.<br/><span style="font-size:11px">' + e.message + '</span>';
+  }
+}
+
+function styleZip(feature) {
+  const zip = feature.properties.ZCTA5CE10;
+  const d = ZIPS[zip];
+  if (!d) return {fillColor:'#ddd', fillOpacity:0.5, color:'#fff', weight:1.5};
+  return {
+    fillColor: getColor(d[currentMode], currentMode),
+    fillOpacity: 0.85, color: '#fff', weight: 1.5
+  };
+}
+
+function makeLabelIcon(zip, d, mode) {
+  return L.divIcon({
+    className: 'zip-label',
+    html: `<div style="
+      font-family:'Inter',sans-serif;font-size:10px;font-weight:600;
+      color:#1a1a1a;background:rgba(255,255,255,0.88);
+      padding:2px 6px;border-radius:2px;white-space:nowrap;
+      text-align:center;line-height:1.3;
+      box-shadow:0 1px 3px rgba(0,0,0,0.15);
+    ">
+      ${zip}<br/>
+      <span style="font-size:9px;color:#a83232;font-weight:500">${fmt(d[mode])}</span>
+    </div>`,
+    iconSize: [60, 28], iconAnchor: [30, 14]
+  });
+}
+
+function bindTooltips() {
+  if (!geoLayer) return;
+  geoLayer.eachLayer(lyr => {
+    const d = lyr._data, zip = lyr._zip;
+    if (!d) return;
+    if (lyr.getTooltip()) lyr.unbindTooltip();
+    lyr.bindTooltip(`
+      <strong style="font-family:'Playfair Display',serif;font-size:14px">ZIP ${zip}</strong><br/>
+      <span style="color:#666">${d.name}</span><br/>
+      <strong style="color:#a83232">${fmtFull(d[currentMode])}</strong>
+      <span style="color:#999;font-size:11px">median ${LABELS[currentMode].toLowerCase()}</span><br/>
+      <span style="color:#888;font-size:11px">${d.count.toLocaleString()} parcels</span>
+    `, {sticky:true, direction:'top'});
+  });
+}
+
+function setMode(mode) {
+  currentMode = mode;
+  ['land','bldg','total'].forEach(m => {
+    document.getElementById('btn-' + m).classList.toggle('active', m === mode);
+  });
+  document.getElementById('title-mode').textContent = LABELS[mode];
+  document.getElementById('legend-title').textContent = LABELS[mode];
+  document.getElementById('s-label-1').textContent = 'City Median ' + LABELS[mode];
+  document.getElementById('table-desc').textContent =
+    'All Toledo ZIP codes ranked by median ' + LABELS[mode].toLowerCase() + '.';
+
+  if (geoLayer) {
+    geoLayer.setStyle(styleZip);
+    bindTooltips();
+  }
+  // Re-render labels
+  labelMarkers.forEach(({marker, zip, data}) => {
+    marker.setIcon(makeLabelIcon(zip, data, mode));
+  });
+  renderLegend(mode);
+  renderStats(mode);
+  renderTable(mode);
+}
+
+function renderLegend(mode) {
+  const html = PALETTES[mode].map((c, i) => `
+    <div class="lscale-row">
+      <div class="lswatch" style="background:${c}"></div>
+      <div class="lscale-text">${bracketLabel(i, mode)}</div>
+    </div>`).join('');
+  document.getElementById('lscale').innerHTML = html;
+
+  const values = Object.values(ZIPS).map(z => z[mode]);
+  const max = Math.max(...values), min = Math.min(...values.filter(v => v > 0));
+  const ratio = (max / min).toFixed(1);
+  const maxZip = Object.entries(ZIPS).find(([_,d]) => d[mode] === max)[0];
+  const minZip = Object.entries(ZIPS).find(([_,d]) => d[mode] === min)[0];
+
+  document.getElementById('callout').innerHTML =
+    `<strong>Disparity:</strong> ZIP <strong>${maxZip}</strong> has median ${LABELS[mode].toLowerCase()} <strong>${ratio}×</strong> that of ZIP <strong>${minZip}</strong> — a stark gap across just a few miles.`;
+}
+
+function renderStats(mode) {
+  const values = Object.values(ZIPS).map(z => z[mode]);
+  const sorted = [...values].sort((a,b) => a-b);
+  const cityMed = sorted[Math.floor(sorted.length/2)];
+  const max = Math.max(...values), min = Math.min(...values.filter(v => v > 0));
+  const ratio = (max / min).toFixed(1);
+
+  document.getElementById('s-val-1').textContent = fmtFull(cityMed);
+  document.getElementById('s-val-2').innerHTML   = fmtFull(max);
+  document.getElementById('s-val-3').innerHTML   = fmtFull(min);
+  document.getElementById('s-val-4').innerHTML   = ratio + '<small>×</small>';
+}
+
+function renderTable(mode) {
+  const sorted = Object.entries(ZIPS).sort((a,b) => b[1][mode] - a[1][mode]);
+  const max = Math.max(...Object.values(ZIPS).map(z => z[mode]));
+  const tbody = document.getElementById('zip-tbody');
+  const accent = mode === 'land' ? '#a83232' : mode === 'bldg' ? '#2d5b6b' : '#6b3f8a';
+
+  // Highlight the active column
+  document.getElementById('th-land').style.color  = mode === 'land'  ? '#1a1a1a' : '';
+  document.getElementById('th-bldg').style.color  = mode === 'bldg'  ? '#1a1a1a' : '';
+  document.getElementById('th-total').style.color = mode === 'total' ? '#1a1a1a' : '';
+
+  tbody.innerHTML = sorted.map(([zip, d]) => {
+    const barW = (d[mode] / max) * 100;
+    const cellClass = (col) => col === mode ? 'style="font-weight:600;color:#1a1a1a"' : 'style="color:#6e6862"';
+    return `
+      <tr>
+        <td><span class="zip-tile" style="background:${getColor(d[mode], mode)}"></span><strong>${zip}</strong></td>
+        <td>${d.name}</td>
+        <td>${d.count.toLocaleString()}</td>
+        <td ${cellClass('land')}>${fmtFull(d.land)}${mode==='land'?`<span class="bar-wrap"><span class="bar-fill" style="width:${barW}%;background:${accent}"></span></span>`:''}</td>
+        <td ${cellClass('bldg')}>${fmtFull(d.bldg)}${mode==='bldg'?`<span class="bar-wrap"><span class="bar-fill" style="width:${barW}%;background:${accent}"></span></span>`:''}</td>
+        <td ${cellClass('total')}>${fmtFull(d.total)}${mode==='total'?`<span class="bar-wrap"><span class="bar-fill" style="width:${barW}%;background:${accent}"></span></span>`:''}</td>
+      </tr>`;
+  }).join('');
+}
+
+// Init
+const totalParcels = Object.values(ZIPS).reduce((s,d) => s + d.count, 0);
+document.getElementById('parcel-count').textContent = totalParcels.toLocaleString();
+renderLegend(currentMode);
+renderStats(currentMode);
+renderTable(currentMode);
+loadMap();
+</script>
+</body>
+</html>
